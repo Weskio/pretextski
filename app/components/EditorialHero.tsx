@@ -126,7 +126,8 @@ export default function EditorialHero({
   return (
     <section
       ref={revealRef as React.RefObject<HTMLElement>}
-      className="reveal relative px-6 md:px-10 pt-12 pb-10"
+      className="reveal relative px-6 md:px-10 pt-12 pb-10 overflow-hidden"
+      style={{ minHeight: 200, maxHeight: 360 }}
     >
       {/* Category + date bar */}
       <div className="flex items-center gap-3 mb-8 font-mono text-[10px] tracking-[0.35em] uppercase">

@@ -1,68 +1,146 @@
-import Masthead from "./components/Masthead";
-import EditorialHero from "./components/EditorialHero";
-import PretextFlow from "./components/PretextFlow";
-import GhostLayer from "./components/GhostLayer";
+import ArticleStage from "./components/ArticleStage";
+import { fetchEverything, fetchTopHeadlines } from "./lib/newsapi";
+import {
+  fallbackEditorialArticles,
+  toEditorialArticle,
+  type EditorialArticle,
+} from "./lib/editorial";
 
-// ---------------------------------------------------------------------------
-// Mock article — replace with a real News API fetch when ready.
-// ---------------------------------------------------------------------------
-const ARTICLE = {
-  category: "SILICON MINDS",
-  date: "2026.03.30",
-  title: "The Machine Learns to Dream in Latent Space",
-  subtitle:
-    "Inside the recursive hallucinations powering the next frontier of generative intelligence — and why the line between prediction and understanding is already blurred.",
-  pullQuote:
-    "The model doesn't understand — it interpolates. But interpolation at sufficient depth begins to look indistinguishable from understanding.",
-  body: `There is a geometry to thought that we are only beginning to trace. Deep inside the embedding spaces of large language models, ideas do not sit as discrete objects — they fold, curve, and collapse into one another in ways that mirror, with uncanny fidelity, the associative architectures of human memory. Researchers call this the latent space. Engineers call it an accident of scale. Philosophers are still arguing about what to call it at all.
+export const dynamic = "force-dynamic";
 
-The question that animates a generation of researchers is deceptively simple: when a model predicts the next token with superhuman consistency, is it understanding the sentence, or is it executing an extraordinarily sophisticated statistical average? The empiricists say it does not matter — capability is the measure. The rationalists say it matters enormously, because a system that mimics understanding without possessing it is, at some point, guaranteed to fail in ways we will not anticipate.
+const EXTRA_CATEGORIES = [
+  "science",
+  "business",
+  "general",
+  "health",
+  "entertainment",
+] as const;
 
-What both camps agree on is that the scale of the disagreement has never been higher. We are now training models whose parameter counts exceed the number of neurons in a human cerebral cortex, on datasets that dwarf the text a single human could read in ten thousand lifetimes. The emergent behaviours that arise at these scales — chain-of-thought reasoning, spontaneous tool use, compositional generalisation — were not designed. They were discovered, often by researchers who ran a benchmark and found results they did not expect.
+type ExtraCategory = (typeof EXTRA_CATEGORIES)[number];
 
-This is the strange epistemology of modern AI development: we build the experiment and then try to understand what happened. The model is not a hypothesis. It is an observation.
+/** Rotates daily so the second block of 10 changes every 24 h. */
+function dailySecondaryCategory(): ExtraCategory {
+  const dayIndex = Math.floor(Date.now() / (24 * 60 * 60 * 1000));
+  return EXTRA_CATEGORIES[dayIndex % EXTRA_CATEGORIES.length];
+}
 
-Inside Anthropic's SF offices, the conversation has shifted from capability benchmarks to something harder to quantify — alignment. The question is not merely whether a model can solve a problem, but whether its solution path is legible, auditable, and stable under distribution shift. A model that solves the training distribution perfectly and fails catastrophically on the first novel input is not a model that understands. It is a model that has overfit to a world that no longer exists.
+async function fetchDefaultArticles(): Promise<{
+  articles: EditorialArticle[];
+  secondaryCategory: string;
+}> {
+  const secondary = dailySecondaryCategory();
 
-The dream, if you can call it that, is a system that generalises the way a skilled engineer does — not by memorising solutions, but by decomposing problems into primitives it has never seen combined in quite this way, and reasoning its way through. Whether the transformer architecture is capable of this remains genuinely open. The evidence is mixed, and the stakes are not.`,
-  ghostWords: ["LATENT", "NEURAL", "DREAM", "VECTORS", "SPACE", "SIGNAL"],
-};
+  const [techResult, secResult] = await Promise.allSettled([
+    fetchTopHeadlines({ category: "technology", pageSize: 10 }),
+    fetchTopHeadlines({ category: secondary, pageSize: 12 }),
+  ]);
 
-export default function Home() {
+  const tech = techResult.status === "fulfilled" ? techResult.value : [];
+  const sec = secResult.status === "fulfilled" ? secResult.value : [];
+
+  const techArticles = tech.map((a) =>
+    toEditorialArticle(a, { fallbackCategory: "technology" }),
+  );
+  const secArticles = sec.map((a) =>
+    toEditorialArticle(a, { fallbackCategory: secondary }),
+  );
+
+  // Deduplicate by id then interleave: tech, sec, tech, sec…
+  const seen = new Set<string>();
+  const interleaved: EditorialArticle[] = [];
+  const maxLen = Math.max(techArticles.length, secArticles.length);
+
+  for (let i = 0; i < maxLen; i++) {
+    for (const pool of [techArticles, secArticles]) {
+      if (i < pool.length) {
+        const a = pool[i];
+        if (!seen.has(a.id) && a.title.trim().length > 0) {
+          seen.add(a.id);
+          interleaved.push(a);
+        }
+      }
+    }
+  }
+
+  return { articles: interleaved.slice(0, 22), secondaryCategory: secondary };
+}
+
+async function fetchCategoryArticles(
+  category: string,
+): Promise<EditorialArticle[]> {
+  const raw = await fetchTopHeadlines({ category, pageSize: 20 });
+  return raw
+    .map((a) => toEditorialArticle(a, { fallbackCategory: category }))
+    .filter((a) => a.title.trim().length > 0)
+    .slice(0, 20);
+}
+
+async function fetchSearchArticles(q: string): Promise<EditorialArticle[]> {
+  const raw = await fetchEverything({ q, pageSize: 20 });
+  return raw
+    .map((a) => toEditorialArticle(a, { fallbackCategory: "SEARCH" }))
+    .filter((a) => a.title.trim().length > 0)
+    .slice(0, 20);
+}
+
+export default async function Home({
+  searchParams,
+}: Readonly<{
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}>) {
+  type SP = Record<string, string | string[] | undefined>;
+  const sp: SP = await (searchParams ?? Promise.resolve<SP>({}));
+
+  const qRaw = sp.q;
+  const q =
+    typeof qRaw === "string"
+      ? qRaw.trim() || undefined
+      : Array.isArray(qRaw) && typeof qRaw[0] === "string"
+        ? qRaw[0].trim() || undefined
+        : undefined;
+
+  const categoryRaw = sp.category;
+  const categoryParam =
+    typeof categoryRaw === "string"
+      ? categoryRaw.trim() || undefined
+      : Array.isArray(categoryRaw) && typeof categoryRaw[0] === "string"
+        ? categoryRaw[0].trim() || undefined
+        : undefined;
+
+  let editorialArticles: EditorialArticle[] = [];
+  let activeCategory = categoryParam ?? "mix";
+
+  try {
+    if (q) {
+      editorialArticles = await fetchSearchArticles(q);
+      activeCategory = "search";
+    } else if (categoryParam) {
+      editorialArticles = await fetchCategoryArticles(categoryParam);
+      activeCategory = categoryParam;
+    } else {
+      const { articles, secondaryCategory } = await fetchDefaultArticles();
+      editorialArticles = articles;
+      activeCategory = `mix:${secondaryCategory}`;
+    }
+  } catch (err) {
+    console.error("NewsAPI fetch failed:", err);
+  }
+
+  if (editorialArticles.length > 0) {
+    return (
+      <ArticleStage
+        editorialArticles={editorialArticles}
+        activeCategory={activeCategory}
+        query={q}
+      />
+    );
+  }
+
   return (
-    <main className="relative min-h-screen bg-bg overflow-x-hidden">
-      {/* Ghost background layer — client-only, non-interactive */}
-      <GhostLayer words={ARTICLE.ghostWords} />
-
-      {/* Everything above the fold */}
-      <div className="relative z-10">
-        <Masthead />
-
-        <EditorialHero
-          title={ARTICLE.title}
-          category={ARTICLE.category}
-          date={ARTICLE.date}
-          subtitle={ARTICLE.subtitle}
-        />
-
-        {/* Body copy section */}
-        <section className="relative px-6 md:px-10 pt-10 pb-20">
-          <PretextFlow text={ARTICLE.body} pullQuote={ARTICLE.pullQuote} />
-        </section>
-
-        {/* Footer rule */}
-        <footer className="px-6 md:px-10 py-6 border-t border-border flex items-center justify-between">
-          <span className="font-mono text-[9px] tracking-[0.3em] uppercase text-muted">
-            PRETEXTSKI — All signals monitored
-          </span>
-          <span
-            className="font-mono text-[9px] tracking-[0.2em]"
-            style={{ color: "var(--accent-lime)" }}
-          >
-            ◈
-          </span>
-        </footer>
-      </div>
-    </main>
+    <ArticleStage
+      editorialArticles={fallbackEditorialArticles()}
+      activeCategory="signal"
+      query={q}
+    />
   );
 }
