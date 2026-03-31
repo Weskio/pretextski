@@ -19,7 +19,7 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Y2K Editorial",
+  title: "PRETEXTSKI",
   description: "Experimental tech journalism at the edge of reason",
 };
 
