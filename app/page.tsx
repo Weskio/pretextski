@@ -53,7 +53,7 @@ export default function Home() {
         {/* Footer rule */}
         <footer className="px-6 md:px-10 py-6 border-t border-border flex items-center justify-between">
           <span className="font-mono text-[9px] tracking-[0.3em] uppercase text-muted">
-            Y2K Editorial — All signals monitored
+            PRETEXTSKI — All signals monitored
           </span>
           <span
             className="font-mono text-[9px] tracking-[0.2em]"

@@ -4,7 +4,7 @@ export default function Masthead() {
       {/* Wordmark */}
       <div className="flex items-baseline gap-3">
         <span className="font-display font-bold text-base tracking-[-0.01em] text-fg">
-          Y2K EDITORIAL
+          PRETEXTSKI
         </span>
         <span
           className="font-mono text-[9px] tracking-[0.3em] uppercase"
@@ -20,7 +20,10 @@ export default function Masthead() {
         <span className="hidden sm:block">Tech / Culture / Signal</span>
         <span
           className="w-2 h-2 rounded-full"
-          style={{ background: "var(--accent-cyan)", boxShadow: "0 0 6px var(--accent-cyan)" }}
+          style={{
+            background: "var(--accent-cyan)",
+            boxShadow: "0 0 6px var(--accent-cyan)",
+          }}
         />
       </div>
 
