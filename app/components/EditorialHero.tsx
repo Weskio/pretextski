@@ -25,7 +25,7 @@ export default function EditorialHero({
   category,
   date,
   subtitle,
-}: Props) {
+}: Readonly<Props>) {
   const containerRef = useRef<HTMLDivElement>(null);
   const revealRef = useScrollReveal<HTMLElement>();
 
@@ -43,7 +43,7 @@ export default function EditorialHero({
       const width = container!.getBoundingClientRect().width;
       if (width === 0) return;
 
-      const fontFamily = window.getComputedStyle(container!).fontFamily;
+      const fontFamily = globalThis.getComputedStyle(container!).fontFamily;
 
       // Short titles → fill 1 line at max size.
       // Long titles → break into 2-3 artistic lines.
