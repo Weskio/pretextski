@@ -1,7 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
 interface Props {
   words: string[];
 }
@@ -25,14 +23,6 @@ function ghostStyle(word: string, i: number) {
 }
 
 export default function GhostLayer({ words }: Props) {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) return null;
-
   return (
     <div
       className="fixed inset-0 pointer-events-none overflow-hidden z-0 select-none"
