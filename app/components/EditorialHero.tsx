@@ -51,6 +51,9 @@ export default function EditorialHero({
       const targetMin = isShort ? 1 : 2;
       const targetMax = isShort ? 1 : 3;
 
+      // Hard pixel cap on the heading block so subtitle/content stays visible.
+      const MAX_HEADING_HEIGHT = 180;
+
       let lo = 24,
         hi = 300,
         bestFontSize = 64,
@@ -74,8 +77,11 @@ export default function EditorialHero({
         }
 
         const lc = measured.length;
-        if (lc > targetMax) {
-          // Too many lines → font too large → shrink
+        const lineHeight = Math.round(mid * 0.94);
+        const totalHeight = lineHeight * lc;
+
+        if (lc > targetMax || totalHeight > MAX_HEADING_HEIGHT) {
+          // Too many lines or too tall → font too large → shrink
           hi = mid - 1;
         } else if (lc < targetMin) {
           // Too few lines → font too small → grow
